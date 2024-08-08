@@ -51,22 +51,65 @@ jobs:
           echo "Blockchain is ready. Proceeding with contract deployment."
 
           npx hardhat ignition deploy ./ignition/modules/Token.js --network devnet
-
-          # Check if deployment was successful
-          if [ $? -eq 0 ]; then
-            echo "Contract deployment successful."
-            echo "DEPLOY_SUCCESS=true" >> $GITHUB_ENV
-          else
-            echo "Contract deployment failed."
-            echo "DEPLOY_SUCCESS=false" >> $GITHUB_ENV
-          fi
         working-directory: ./hardhat
 
-      - name: Stop local devnet
+      - name: Verify contract Deployment
+        run: |
+          # Navigate to the deployments directory
+          cd ignition/deployments
+          # Find the chain directory
+          CHAIN_DIR=$(ls -d chain-* | head -n 1)
+          cd "$CHAIN_DIR"
+
+          # Extract the contract address
+          CONTRACT_ADDRESS=$(jq -r '."TokenModule#Token"' deployed_addresses.json)
+
+          echo "Verifying deployment for contract at address: $CONTRACT_ADDRESS"
+
+          # Set the number of attempts and delay between attempts
+          MAX_ATTEMPTS=12
+          DELAY_SECONDS=10
+          attempt=0 
+          deploy_success=false
+
+          while [ $attempt -lt $MAX_ATTEMPTS ]; do 
+            attempt=$((attempt+1))
+            echo "Attempt $attempt of $MAX_ATTEMPTS"
+
+            # Check the bytecode
+            RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
+              --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}" \
+              http://localhost:8545)
+
+            # Check if the result is just "0x" (empty bytecode)
+            if [ "$(echo $RESULT | jq -r '.result')" != "0x" ]; then
+              echo "Contract deployment verified successfully. Bytecode found at the address."
+              deploy_success=true
+              break
+            fi
+
+            echo "No bytecode found at the address. Retrying in $DELAY_SECONDS seconds..."
+            if [ $attempt -lt $MAX_ATTEMPTS ]; then
+              sleep $DELAY_SECONDS
+            fi
+          done
+
+          if [ "$deploy_success" = true ]; then
+            echo "DEPLOY_SUCCESS=true" >> $GITHUB_ENV
+          else
+            echo "Contract deployment verification failed after $MAX_ATTEMPTS attempts."
+            echo "DEPLOY_SUCCESS=false" >> $GITHUB_ENV
+            exit 1
+          fi 
+        working-directory: ./hardhat
+
+      - name: Pause and export data directory
         if: env.DEPLOY_SUCCESS == 'true'
         run: |
-          echo "Stopping local devnet..."
-          docker compose -f devnet/docker-compose.yml down
+          echo "Pausing local devnet..."
+          docker pause geth-node
+          docker cp geth-node:/root/.ethereum ./ethereum_data
+        working-directory: ./devnet
 
       - name: Handle deployment failure
         if: env.DEPLOY_SUCCESS != 'true'
@@ -74,11 +117,6 @@ jobs:
           echo "Deployment failed. Stopping devnet and exiting..."
           docker compose -f devnet/docker-compose.yml down
           exit 1
-
-      - name: Export data directory 
-        run: |
-          docker cp geth-node:/root/.ethereum ./ethereum_data
-        working-directory: ./devnet
           
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
