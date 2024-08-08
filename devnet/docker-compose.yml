@@ -1,6 +1,6 @@
 services:
   geth:
-    image: geth-local:latest
+    image: peoples93/go-ethereum-limechain:base
     container_name: geth-node
     ports:
       - "8545:8545"
