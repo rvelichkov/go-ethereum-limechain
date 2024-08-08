@@ -50,22 +50,11 @@ jobs:
           done
           echo "Blockchain is ready. Proceeding with contract deployment."
 
-          npx hardhat ignition deploy ./ignition/modules/Token.js --network devnet
+          yes | npx hardhat ignition deploy ./ignition/modules/Token.js --network devnet
         working-directory: ./hardhat
 
       - name: Verify contract Deployment
         run: |
-          # Navigate to the deployments directory
-          cd ignition/deployments
-          # Find the chain directory
-          CHAIN_DIR=$(ls -d chain-* | head -n 1)
-          cd "$CHAIN_DIR"
-
-          # Extract the contract address
-          CONTRACT_ADDRESS=$(jq -r '."TokenModule#Token"' deployed_addresses.json)
-
-          echo "Verifying deployment for contract at address: $CONTRACT_ADDRESS"
-
           # Set the number of attempts and delay between attempts
           MAX_ATTEMPTS=12
           DELAY_SECONDS=10
@@ -76,16 +65,31 @@ jobs:
             attempt=$((attempt+1))
             echo "Attempt $attempt of $MAX_ATTEMPTS"
 
-            # Check the bytecode
-            RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
-              --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}" \
-              http://localhost:8545)
+            if [ -d "ignition/deployments" ]; then
+              # Navigate to the deployments directory
+              cd ignition/deployments
+              # Find the chain directory
+              CHAIN_DIR=$(ls -d chain-* | head -n 1)
+              if [ -n "$CHAIN_DIR" ]; then
+                cd "$CHAIN_DIR"
+                # Extract the contract address
+                CONTRACT_ADDRESS=$(jq -r '."TokenModule#Token"' deployed_addresses.json)
+                echo "Verifying deployment for contract at address: $CONTRACT_ADDRESS"
+                RESULT=$(curl -s -X POST -H "Content-Type: application/json" \
+                  --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getCode\",\"params\":[\"$CONTRACT_ADDRESS\", \"latest\"],\"id\":1}" \
+                  http://localhost:8545)
 
-            # Check if the result is just "0x" (empty bytecode)
-            if [ "$(echo $RESULT | jq -r '.result')" != "0x" ]; then
-              echo "Contract deployment verified successfully. Bytecode found at the address."
-              deploy_success=true
-              break
+                # Check if the result is just "0x" (empty bytecode)
+                if [ "$(echo $RESULT | jq -r '.result')" != "0x" ]; then
+                  echo "Contract deployment verified successfully. Bytecode found at the address."
+                  deploy_success=true
+                  break
+                fi
+              else
+                echo "No chain directory found in ignition/deployments."
+              fi 
+            else
+              echo "The ignition/deployments directory does not exist."
             fi
 
             echo "No bytecode found at the address. Retrying in $DELAY_SECONDS seconds..."
