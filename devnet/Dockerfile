@@ -1,5 +1,5 @@
 # Use the same base image as the original geth image
-FROM ethereum/client-go:base
+FROM peoples93/go-ethereum-limechain:base
 
 # Copy the blockchain state into the image
 COPY ethereum_data /root/.ethereum
