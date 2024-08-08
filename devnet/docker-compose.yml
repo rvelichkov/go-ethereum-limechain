@@ -1,0 +1,42 @@
+services:
+  geth:
+    image: peoples93/go-ethereum-limechain:latest
+    container_name: geth-node
+    volumes:
+      - ./genesis.json:/genesis.json
+      - geth-data:/root/.ethereum
+    ports:
+      - "8545:8545"
+      - "30303:30303"
+    command:
+      - --datadir=/root/.ethereum
+      - --networkid=15
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=8545
+      - --http.corsdomain=*
+      - --http.api=eth,net,web3,personal
+      - --allow-insecure-unlock
+      - --mine
+      - --miner.etherbase=0xC07D0EB261dE3149619a85255883c7A5Bc86E0E4
+    entrypoint: 
+      - /bin/sh
+      - -c
+      - |
+        echo "Content of genesis.json:"
+        cat /genesis.json
+        echo "End of genesis.json"
+        if [ ! -f /root/.ethereum/geth/chaindata/CURRENT ]; then
+          echo "Initializing geth with custom genesis block..."
+          geth --datadir=/root/.ethereum init /genesis.json
+        else
+          echo "Ethereum data directory already initialized."
+        fi
+        exec geth "$@"
+
+volumes:
+  geth-data:
+
+networks:
+  default:
+    name: geth-network
