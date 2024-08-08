@@ -37,12 +37,43 @@ jobs:
 
       - name: Deploy contracts 
         run: |
+          max_attempts=30
+          attempt=0
+          while ! curl -s http://localhost:8545 -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":67}" > /dev/null; do
+            if [ $attempt -eq $max_attempts ]; then
+              echo "Blockchain failed to start after $max_attempts attempts."
+              exit 1
+            fi
+            attempt=$((attempt+1))
+            echo "Waiting for blockchain to be ready... (Attempt $attempt)"
+            sleep 5
+          done
+          echo "Blockchain is ready. Proceeding with contract deployment."
+
           npx hardhat ignition deploy ./ignition/modules/Token.js --network devnet
+
+          # Check if deployment was successful
+          if [ $? -eq 0 ]; then
+            echo "Contract deployment successful."
+            echo "DEPLOY_SUCCESS=true" >> $GITHUB_ENV
+          else
+            echo "Contract deployment failed."
+            echo "DEPLOY_SUCCESS=false" >> $GITHUB_ENV
+          fi
         working-directory: ./hardhat
 
       - name: Stop local devnet
+        if: env.DEPLOY_SUCCESS == 'true'
         run: |
+          echo "Stopping local devnet..."
           docker compose -f devnet/docker-compose.yml down
+
+      - name: Handle deployment failure
+        if: env.DEPLOY_SUCCESS != 'true'
+        run: |
+          echo "Deployment failed. Stopping devnet and exiting..."
+          docker compose -f devnet/docker-compose.yml down
+          exit 1
 
       - name: Export data directory 
         run: |
