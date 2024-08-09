@@ -128,3 +128,28 @@ jobs:
           context: ./devnet
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/go-ethereum-limechain:contracts-deployed
+
+      - name: Run Hardhat tests against predeployed contracts image
+        if: success()
+        continue-on-error: true
+        run: |
+          # Run a new container with the predeployed contracts image
+          docker run -d -p 8546:8545 --name test-node ${{ secrets.DOCKER_USERNAME }}/go-ethereum-limechain:contracts-deployed
+
+          # Wait for the node to be ready
+          max_attempts=30
+          attempt=0 
+          while ! curl -s http://localhost:8546 -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":67}" > /dev/null; do
+            if [ $attempt -eq $max_attempts ]; then
+              echo "Node failed to start after $max_attempts attempts."
+              exit 1
+            fi
+            attempt=$((attempt+1))
+            echo "Waiting for node to be ready... (Attempt $attempt)"
+            sleep 5
+          done
+          echo "Node is ready. Proceeding with Hardhat tests."
+
+          # Run Hardhat tests
+          npx hardhat test --network testnet
+        working-directory: ./hardhat
