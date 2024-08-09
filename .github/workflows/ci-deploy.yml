@@ -139,31 +139,17 @@ jobs:
           # Wait for the node to be ready
           max_attempts=30
           attempt=0 
-          while [ $attempt -lt $max_attempts ]; do
-            attempt=$((attempt+1))
-            echo "Attempt $attempt of $max_attempts"
-            
-            if curl -s -X POST -H "Content-Type: application/json" \
-              --data "{"jsonrpc":"2.0","method":"net_version","params":[],"id":67}" \
-              http://localhost:8546 | grep -q "result"; then
-              echo "Node is ready!"
-              break
-            else
-              echo "Node not ready. Waiting..."
-              # Print the last few lines of container logs
-              echo "Container logs:"
-              docker logs --tail 20 test-node
-              sleep 10
+          while ! curl -s http://localhost:8546 -X POST -H "Content-Type: application/json" --data "{\"jsonrpc\":\"2.0\",\"method\":\"net_version\",\"params\":[],\"id\":67}" > /dev/null; do
+            if [ $attempt -eq $max_attempts ]; then
+              echo "Blockchain failed to start after $max_attempts attempts."
+              docker logs test-node
+              exit 1
             fi
+            attempt=$((attempt+1))
+            echo "Waiting for blockchain to be ready... (Attempt $attempt)"
+            sleep 5
           done
-
-          if [ $attempt -eq $max_attempts ]; then
-            echo "Node failed to start after $max_attempts attempts."
-            echo "Final container logs:"
-            docker logs test-node
-            exit 1
-          fi
-
+          echo "Blockchain is ready. Proceeding with Hardhat tests."
          
           # Run Hardhat tests
           npx hardhat test --network testnet
