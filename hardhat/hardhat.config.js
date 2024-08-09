@@ -8,6 +8,9 @@ module.exports = {
   networks: {
     devnet: {
       url: "http://localhost:8545",
+    },
+    testnet: {
+      url: "http://localhost:8546",
     }
   }
 };
