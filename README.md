@@ -1,3 +1,35 @@
+## Extended go-ethereum with CI/CD and Smart Contract Deployment
+
+This repository is a fork of go-ethereum (geth) with additional features and CI/CD pipelines. It includes automated Docker image building, local devnet setup, Hardhat integration for smart contract deployment, and Terraform scripts for cloud deployment.
+
+## New features 
+1. Automated Docker Image Building 
+When a PR with the label CI:Build is merged:
+- A GitHub Action is triggered to build a new Docker image of the project
+- The image is uploaded to a specified Docker registry
+
+2. Local Devnet with Docker Compose
+A docker-compose.yml file is provided to run a local devnet using the newly built geth image. To start the devnet:
+```shell
+cd devnet/
+docker-compose up -d
+```
+
+3. Hardhat Integration 
+A new hardhat directory contains a Sample Hardhat Project. When a PR with the label CI:Deploy is merged:
+- A pipeline is triggered that:
+    - Runs a local devnet using the pre-built docker image from CI:Build workflow 
+    - Deploys the Sample Hardhat Project to the devnet 
+    - Builds a new Docker image with pre-deployed contracts
+    - Uploads the image to the registry with a different tag 
+    - The CI/CD pipeline includes a step to run Hardhat tests against the image with pre-deployed contracts
+
+5. Terraform Cloud Deployment 
+A Terraform script is provided to quickly create a Kubernetes cluster in the cloud and deploy an instance of the built image. 
+
+6. Blockscout Explorer Integration 
+The Docker Compose definition includes Blockscout, an Ethereum blockchain explorer. This integration allows for exploration and analysis of the blockchain data on the local devnet.
+
 ## Go Ethereum
 
 Golang execution layer implementation of the Ethereum protocol.
