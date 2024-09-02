@@ -12,7 +12,8 @@ services:
       - --http.addr=0.0.0.0
       - --http.port=8545
       - --http.corsdomain=*
-      - --http.api=eth,net,web3,personal,debug
+      - --http.api=eth,net,web3,personal,debug,txpool
+      - --http.vhosts=*
       - --allow-insecure-unlock
       - --verbosity=4
     volumes:
@@ -105,6 +106,13 @@ services:
     extends:
       file: ./services/nginx.yml
       service: proxy
+
+  debug:
+    image: appropriate/curl  # A minimal image with curl
+    command: ["sleep", "3600"]  # Keep it running for an hour
+    networks:
+     - default
+
 
 volumes:
   geth-data:

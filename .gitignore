@@ -50,3 +50,9 @@ profile.cov
 logs/
 
 tests/spec-tests/
+
+
+# Ignore generated service data directories
+devnet/services/blockscout-db-data/
+devnet/services/redis-data/
+devnet/services/stats-db-data/
